@@ -2,7 +2,7 @@ version: '3'
 
 services:
   nginx:
-    image: nginx:1.17.6-alpine
+    image: nginx:1.17.6-alpine # Using alpine version because it's clean
     container_name: nginx
     ports: 
       - "8000:80"
@@ -11,13 +11,13 @@ services:
     image: nginx:1.17.6-alpine
     container_name: node1
     ports: 
-      - "80"  ## quem acessa o node1 é nginx por isso nao precisa redirecionar roda
+      - "80"
 
   node2:
     image: nginx:1.17.6-alpine
     container_name: node2
     ports: 
-      - "80"  ## quem acessa o node1 é nginx por isso nao precisa redirecionar roda
+      - "80"
   
   node3:
     image: nginx:1.17.6-alpine

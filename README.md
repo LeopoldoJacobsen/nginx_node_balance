@@ -1,134 +1,73 @@
-antes de iniciar as etapas, execute:
+# STEP 1 - INIT DOCKER COMPOSE
 >>> command: docker-compose up -d
 
 
-# ETAPA 1 CONFIGURAR NGINX SERVER
+# STEP 2 - SETUP NGINX LOAD BALANCER CONTAINER
 
-Como foi instalado o nginx alphine é necessario add o bash
- >>> command: docker-compose exec nginx apk add 
-Para entrar no nginx
+Install bash and vim to container
+ >>> command: docker-compose exec nginx apk add bash vim
+
+Access container using bash
 >>> command: docker-compose exec nginx bash
-Add vim no nginx para editar arquivos
->>> command: apk add vim
-Arquivo de configuracao do nginx, esse arquivo raramente será mexido, é configuracoes de tuning
+
+# STEP 3 - SET NGINX.CONF FILE
+
+Edit NGINX.CONF File
 >>> command: vim /etc/nginx/nginx.conf
-O Arquivo que será configurado é o default.conf, esse arquivo é o que faz o welcome. remover tudo de #error_page
->>> command: vim /etc/nginx/conf.d/default.conf
+Change '$remote_addr' to '$http_x_real_ip' to capture the user IP instead of the node IP
 
-O arquivo default fica:
+
+# STEP 4 - SET DEFAULT.CONF FILE LOAD BALANCER
+Edit DEFAULT.CONF File -> Where we set the different container environments on Load Balancer
+>>> command: vim /etc/nginx/conf.d/default.conf
+Add the 'upstream' variable with the nodes at the top of the file:
 
 ```
-server {
-    listen          80;         //porta default
-    server_name     localhost;  //domain, exemplo.com
-
-    location / {                //quando acessar / redireciona
-        root /usr/share/nginx/html
-        index index.html index.html
-    }
+upstream nodes{
+    server node1;
+    server node2;
+    server node3;
 }
 ```
 
-Após configurar o arquivo, pode ser rodado o comando abaixo para testar se o arquivo está ok
-
->>> command: nginx -t
-
-
-
-# ETAPA 2 CONFIGURAR NODE1
-
-Iniciar instalando bash e node
->>> command: docker-compose exec node1 apk add bash vim
-Para executar o bash
->>> command: docker-compose exec node1 bash
-Acessar arquivo HTML para renomear para NODE1 e ver acontecer
->>> command: vim /etc/share/nginx/html/index.HTML
-
-
-# ETAPA 3 CONFIGURAR PROXY REVERSO NO SERVICE NGINX 
-
-Entrar no nginx e mudar o location
->>> command: docker-compose exec nginx bash
->>> command: vim /etc/nginx/conf.d/default.conf
-o proxy_pass listado no arquivo abaixo diz que quando tiver uma requisicao no http://localhost/ será redirecionado para o http://node1
+On 'location' set the Reverse proxy using:
 
 ```
-server {
-    listen          80;         //porta default
-    server_name     localhost;  //domain, exemplo.com
-
-    location / {                //quando acessar / redireciona
-        proxy_pass http://node1;
-    } 
-}
+    proxy_pass http://nodes;
+    proxy_set_header X-Real-IP $remote_addr;
 ```
-rodar nginx -t para ver se o arquivo tem alguma falha
+
+USE Command to test and see if will run
 >>> command: nginx -t
-rodar nginx -g reload para reiniciar o server
+
+USE Command to reload the webserver
 >>> command: nginx -s reload
 
-# ETAPA 4 CONFIGURAR NODE2
 
-nessa etapa vamos iniciar o node balance
-Iniciar instalando bash e node
->>> command: docker-compose exec node2 apk add bash vim
-Para executar o bash
->>> command: docker-compose exec node2 bash
-Acessar arquivo HTML para renomear para NODE2 e ver acontecer
->>> command: vim /etc/share/nginx/html/index.HTML
-
-# ETAPA 5 CONFIGURAR NODE BALANCE NO NGINX
-entrar no node nginx
->>> command: docker-compose exec nginx bash
-acessar arquivo de configuracao
+# STEP 5 - SETUP ACCESS LOGS
+Edit DEFAULT.CONF File -> Where we set the different container environments on Load Balancer
 >>> command: vim /etc/nginx/conf.d/default.conf
-para configurar o nodebalance é muito simples
-colocar 'upstream name{}'
-```
-upstream nodes{
-    server node1;
-    server node2;
-}
-
-server {
-    listen          80;         //porta default
-    server_name     localhost;  //domain, exemplo.com
-
-    location / {                //quando acessar / redireciona
-        proxy_pass http://nodes;
-    } 
-}
-```
-
-# ETAPA 6 - Adicionar ACCESS log do node balance
-
-o arquivo de configuracao abaixo possibilita o log dos nodes
-o nome do arquivo é a sua escolha, no caso deixei nginx-access pra ficar mais fácil de identificar
+Remove the comment from the access_log and rename it to 'nginx-access.log'; remove 'main;' at the end (nginx or node1 or node2 or node3);
 
 ```
-upstream nodes{
-    server node1;
-    server node2;
-}
+    access_log /var/log/nginx/nginx-access.log; (nginx-access or node1-access or node2-access or node3-access);
+``` 
 
-server {
-    listen          80;         //porta default
-    server_name     localhost;  //domain, exemplo.com
+USE Command to test and see if will run
+>>> command: nginx -t
 
-    access_log /var/log/nginx/nginx-access.log // se nao pegar o ip real, colocar main na frente
+USE Command to reload the webserver
+>>> command: nginx -s reload
 
-    location / {                //quando acessar / redireciona
-        proxy_pass http://nodes;
-        proxy_set_header X-Real-IP $remote_addr; // passa o ip do client que consultou o server
-    } 
+# STEP 6 - SETUP NODES 1,2 and 3
 
-}
-```
+Add the bash and vim to each node using:
+>>> command: docker-compose exec node1 apk add bash vim
 
-alterar arquivo nginx.conf
->>> command: vim /etc/nginx/nginx.conf
-editar arquivo de log_forma e alterar o main para
+Run bash on each node
+>>> command: docker-compose exec node1 bash
 
-```
-    log_format main '$remote_addr' por '$http_x_real_ip' 
-```
+Edit index.html to differentiate between nodes
+>>> command: vim /usr/share/nginx/html/index.html
+
+Repeat STEP 5 to each node to add the access log. And then repeat the STEP 6 for all nodes.
